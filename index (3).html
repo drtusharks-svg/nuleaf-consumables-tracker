@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuleaf Consumables Tracker</title>
+<style>
+  :root{
+    --ink:#1c2b2a;
+    --ink-soft:#516462;
+    --paper:#f5f7f6;
+    --card:#ffffff;
+    --line:#dde5e3;
+    --teal:#0e6b62;
+    --teal-dark:#0a4a44;
+    --teal-pale:#e4f2f0;
+    --amber:#b8873a;
+    --red:#b8433a;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper); color:var(--ink);
+  }
+  header{
+    background:var(--teal-dark); color:#fff; padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+  header h1{margin:0; font-size:19px; font-weight:650; letter-spacing:.2px;}
+  header .sub{font-size:12px; opacity:.75; margin-top:2px;}
+  #connStatus{font-size:12px; padding:4px 10px; border-radius:20px; background:rgba(255,255,255,.12);}
+  #connStatus.ok{background:#1c8a6f;}
+  #connStatus.bad{background:#a4392f;}
+  nav{
+    display:flex; gap:2px; background:var(--teal); padding:0 20px; overflow-x:auto;
+  }
+  nav button{
+    background:none; border:none; color:#eafcf8; padding:12px 16px; font-size:13.5px; cursor:pointer;
+    border-bottom:3px solid transparent; white-space:nowrap; font-weight:500; opacity:.85;
+  }
+  nav button:hover{opacity:1;}
+  nav button.active{border-bottom-color:var(--amber); opacity:1; background:rgba(255,255,255,.07);}
+  main{max-width:1180px; margin:0 auto; padding:22px 20px 60px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; margin-bottom:18px;
+  }
+  .card h2{margin:0 0 14px; font-size:16px; color:var(--teal-dark);}
+  .row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;}
+  .field{display:flex; flex-direction:column; gap:5px; flex:1; min-width:160px;}
+  .field label{font-size:12px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.3px;}
+  input, select, textarea{
+    padding:9px 10px; border:1px solid var(--line); border-radius:7px; font-size:14px; background:#fff; color:var(--ink);
+    font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--teal); outline-offset:0; border-color:var(--teal);}
+  button.primary{
+    background:var(--teal); color:#fff; border:none; padding:11px 20px; border-radius:7px; font-size:14px;
+    font-weight:600; cursor:pointer;
+  }
+  button.primary:hover{background:var(--teal-dark);}
+  button.ghost{
+    background:none; border:1px solid var(--line); padding:8px 14px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--ink);
+  }
+  button.ghost:hover{border-color:var(--teal); color:var(--teal-dark);}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th,td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left;}
+  th{background:var(--teal-pale); color:var(--teal-dark); font-weight:650; position:sticky; top:0;}
+  tbody tr:hover{background:#fafdfc;}
+  .items-table td.qty-cell input{width:80px;}
+  .items-table td.unit-cell select{width:100px;}
+  .table-wrap{max-height:480px; overflow:auto; border:1px solid var(--line); border-radius:8px;}
+  .muted{color:var(--ink-soft); font-size:12.5px;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:20px; background:var(--teal-pale); color:var(--teal-dark); font-size:12px; font-weight:600;}
+  .toast{
+    position:fixed; bottom:24px; right:24px; background:var(--teal-dark); color:#fff; padding:12px 18px;
+    border-radius:8px; font-size:13.5px; box-shadow:0 4px 18px rgba(0,0,0,.2); z-index:999; opacity:0; transform:translateY(8px);
+    transition:all .25s ease;
+  }
+  .toast.show{opacity:1; transform:translateY(0);}
+  .toast.error{background:var(--red);}
+  .report-tabs{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .report-tabs button.rtab{
+    background:#fff; border:1px solid var(--line); padding:8px 14px; border-radius:20px; cursor:pointer; font-size:13px;
+  }
+  .report-tabs button.rtab.active{background:var(--teal); color:#fff; border-color:var(--teal);}
+  .stat-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px;}
+  .stat{background:var(--teal-pale); border-radius:8px; padding:14px 18px; min-width:150px;}
+  .stat .num{font-size:22px; font-weight:700; color:var(--teal-dark);}
+  .stat .lbl{font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.3px; margin-top:2px;}
+  .flex-between{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
+  .footer-note{font-size:12px; color:var(--ink-soft); margin-top:30px; text-align:center;}
+  #setupNotice{
+    background:#fff7e6; border:1px solid #f0d59a; color:#7a5b16; padding:14px 18px; border-radius:8px; margin-bottom:16px; font-size:13.5px;
+  }
+  code{background:#eef3f2; padding:1px 5px; border-radius:4px; font-size:12.5px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Nuleaf Consumables Tracker</h1>
+    <div class="sub">Surgical consumable usage &amp; purchase records</div>
+  </div>
+  <div id="connStatus">checking connection…</div>
+</header>
+
+<nav>
+  <button data-panel="usage" class="active">Record Usage</button>
+  <button data-panel="purchase">Record Purchase</button>
+  <button data-panel="usageLog">Usage Log</button>
+  <button data-panel="purchaseLog">Purchase Log</button>
+  <button data-panel="reports">Reports</button>
+  <button data-panel="admin">Items &amp; Vendors</button>
+</nav>
+
+<main>
+
+<div id="setupNoticeWrap"></div>
+
+<!-- RECORD USAGE -->
+<section class="panel active" id="panel-usage">
+  <div class="card">
+    <h2>Record consumables used for a patient</h2>
+    <div class="row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="u_date">
+      </div>
+      <div class="field" style="flex:2;">
+        <label>Patient Name</label>
+        <input type="text" id="u_patient" list="patientList" placeholder="Start typing patient name…">
+        <datalist id="patientList"></datalist>
+      </div>
+      <div class="field">
+        <label>Entered By (staff)</label>
+        <input type="text" id="u_staff" placeholder="Your name">
+      </div>
+    </div>
+    <div class="table-wrap" style="max-height:440px;">
+      <table class="items-table">
+        <thead><tr><th>Item</th><th>Quantity</th><th>Unit</th></tr></thead>
+        <tbody id="usageItemsBody"></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <div class="field" style="flex:3;">
+        <label>Notes (optional, applies to all items in this entry)</label>
+        <input type="text" id="u_notes" placeholder="e.g. Day 2 of 3, session 2">
+      </div>
+    </div>
+    <button class="primary" id="submitUsageBtn">Save entry</button>
+    <span class="muted" id="usageSaveMsg" style="margin-left:12px;"></span>
+  </div>
+</section>
+
+<!-- RECORD PURCHASE -->
+<section class="panel" id="panel-purchase">
+  <div class="card">
+    <h2>Record a consumable purchase</h2>
+    <div class="row">
+      <div class="field">
+        <label>Date of Purchase</label>
+        <input type="date" id="p_date">
+      </div>
+      <div class="field" style="flex:2;">
+        <label>Item</label>
+        <select id="p_item"></select>
+      </div>
+      <div class="field">
+        <label>Quantity</label>
+        <input type="number" id="p_qty" min="0" step="any">
+      </div>
+      <div class="field">
+        <label>Unit</label>
+        <select id="p_unit">
+          <option value="pieces">pieces</option>
+          <option value="ml">ml</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Cost per Item (₹)</label>
+        <input type="number" id="p_cost" min="0" step="any">
+      </div>
+      <div class="field">
+        <label>Total Cost (₹)</label>
+        <input type="text" id="p_total" disabled>
+      </div>
+      <div class="field" style="flex:2;">
+        <label>Vendor</label>
+        <select id="p_vendor"></select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:3;">
+        <label>Notes (optional)</label>
+        <input type="text" id="p_notes" placeholder="Invoice #, batch, etc.">
+      </div>
+    </div>
+    <button class="primary" id="submitPurchaseBtn">Save purchase</button>
+    <span class="muted" id="purchaseSaveMsg" style="margin-left:12px;"></span>
+  </div>
+</section>
+
+<!-- USAGE LOG -->
+<section class="panel" id="panel-usageLog">
+  <div class="card">
+    <div class="flex-between">
+      <h2 style="margin:0;">Usage log</h2>
+      <div style="display:flex; gap:8px;">
+        <input type="date" id="ul_from">
+        <input type="date" id="ul_to">
+        <input type="text" id="ul_patient" placeholder="Filter by patient…">
+        <button class="ghost" id="ul_export">Export CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top:14px;">
+      <table>
+        <thead><tr><th>Date</th><th>Patient</th><th>Item</th><th>Qty</th><th>Unit</th><th>Staff</th><th>Notes</th></tr></thead>
+        <tbody id="usageLogBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PURCHASE LOG -->
+<section class="panel" id="panel-purchaseLog">
+  <div class="card">
+    <div class="flex-between">
+      <h2 style="margin:0;">Purchase log</h2>
+      <div style="display:flex; gap:8px;">
+        <input type="date" id="pl_from">
+        <input type="date" id="pl_to">
+        <select id="pl_vendor"><option value="">All vendors</option></select>
+        <button class="ghost" id="pl_export">Export CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top:14px;">
+      <table>
+        <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>Total</th><th>Vendor</th><th>Notes</th></tr></thead>
+        <tbody id="purchaseLogBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- REPORTS -->
+<section class="panel" id="panel-reports">
+  <div class="card">
+    <h2>Reports</h2>
+    <div class="report-tabs">
+      <button class="rtab active" data-r="patient">Cost per Patient</button>
+      <button class="rtab" data-r="month">Cost per Month</button>
+      <button class="rtab" data-r="year">Cost per Year</button>
+      <button class="rtab" data-r="vendor">Cost per Vendor</button>
+    </div>
+
+    <div id="report-patient" class="rpanel">
+      <div class="row">
+        <div class="field" style="flex:2;">
+          <label>Patient</label>
+          <select id="rp_patient"></select>
+        </div>
+      </div>
+      <div class="stat-row" id="rp_stats"></div>
+      <div class="flex-between"><span class="muted">Item-wise breakdown across all visit dates for this patient</span>
+        <button class="ghost" id="rp_export">Export CSV</button></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Item</th><th>Total Qty Used</th><th>Unit</th><th>Avg Cost/Unit</th><th>Cost</th></tr></thead>
+        <tbody id="rp_body"></tbody></table>
+      </div>
+      <div class="flex-between" style="margin-top:18px;"><span class="muted">All patients — total cost summary</span></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Patient</th><th>Visit Dates</th><th>Total Cost</th></tr></thead>
+        <tbody id="rp_all_body"></tbody></table>
+      </div>
+    </div>
+
+    <div id="report-month" class="rpanel" style="display:none;">
+      <div class="flex-between"><span class="muted">Consumable usage cost, grouped by calendar month</span>
+        <button class="ghost" id="rm_export">Export CSV</button></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Month</th><th>Usage Cost</th><th>Purchase Cost</th></tr></thead>
+        <tbody id="rm_body"></tbody></table>
+      </div>
+    </div>
+
+    <div id="report-year" class="rpanel" style="display:none;">
+      <div class="flex-between"><span class="muted">Consumable usage cost, grouped by year</span>
+        <button class="ghost" id="ry_export">Export CSV</button></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Year</th><th>Usage Cost</th><th>Purchase Cost</th></tr></thead>
+        <tbody id="ry_body"></tbody></table>
+      </div>
+    </div>
+
+    <div id="report-vendor" class="rpanel" style="display:none;">
+      <div class="flex-between"><span class="muted">Total purchase cost per vendor</span>
+        <button class="ghost" id="rv_export">Export CSV</button></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Vendor</th><th># Purchases</th><th>Total Qty</th><th>Total Cost</th></tr></thead>
+        <tbody id="rv_body"></tbody></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN -->
+<section class="panel" id="panel-admin">
+  <div class="card">
+    <h2>Items master list</h2>
+    <div class="row">
+      <div class="field" style="flex:2;"><label>New item name</label><input type="text" id="a_itemName"></div>
+      <div class="field"><label>Default unit</label>
+        <select id="a_itemUnit"><option value="pieces">pieces</option><option value="ml">ml</option></select>
+      </div>
+      <div class="field" style="justify-content:flex-end;"><button class="primary" id="a_addItem">Add item</button></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th>Default Unit</th></tr></thead><tbody id="a_itemsBody"></tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Vendors</h2>
+    <div class="row">
+      <div class="field" style="flex:2;"><label>New vendor name</label><input type="text" id="a_vendorName"></div>
+      <div class="field" style="justify-content:flex-end;"><button class="primary" id="a_addVendor">Add vendor</button></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Vendor</th></tr></thead><tbody id="a_vendorsBody"></tbody></table></div>
+  </div>
+</section>
+
+<div class="footer-note">Nuleaf Skin Clinic &amp; Hair Transplant Centre — internal use</div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIGURATION ============
+   Paste your Google Apps Script Web App URL below (see Code.gs setup notes).
+   It looks like: https://script.google.com/macros/s/XXXXXXXX/exec
+*/
+const API_URL = "https://script.google.com/macros/s/AKfycbwCkDJWvhUAf5QvpU1QzlqcrMGw7EZBLUbU5ZQSbmqQMXM990b6lPhu_1seBa1Ek9y-wg/exec";
+/* ======================================= */
+
+let STATE = { items: [], vendors: [], consumableLog: [], purchaseLog: [] };
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=> t.className = 'toast', 2600);
+}
+
+function apiConfigured(){
+  return API_URL && API_URL.indexOf('PASTE_YOUR') === -1;
+}
+
+async function apiGet(action){
+  const res = await fetch(API_URL + '?action=' + encodeURIComponent(action));
+  const json = await res.json();
+  if(!json.success) throw new Error(json.error || 'Unknown API error');
+  return json.data;
+}
+
+async function apiPost(action, payload){
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight against Apps Script
+    body: JSON.stringify(Object.assign({action}, payload))
+  });
+  const json = await res.json();
+  if(!json.success) throw new Error(json.error || 'Unknown API error');
+  return json.data;
+}
+
+/* ---------- NAV ---------- */
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+    if(btn.dataset.panel === 'reports') renderActiveReport();
+  });
+});
+
+/* ---------- INIT ---------- */
+async function init(){
+  document.getElementById('u_date').value = todayStr();
+  document.getElementById('p_date').value = todayStr();
+  document.getElementById('u_staff').value = localStorage.getItem('nuleaf_staff_name') || '';
+  document.getElementById('u_staff').addEventListener('change', e=> localStorage.setItem('nuleaf_staff_name', e.target.value));
+
+  const connEl = document.getElementById('connStatus');
+  if(!apiConfigured()){
+    connEl.textContent = 'Backend not configured';
+    connEl.className = 'bad';
+    document.getElementById('setupNoticeWrap').innerHTML =
+      '<div id="setupNotice">This app needs to be connected to its Google Sheet backend. '
+      + 'Open <code>index.html</code>, find the line starting with <code>const API_URL</code>, '
+      + 'and paste in your deployed Apps Script Web App URL. See the setup notes at the top of '
+      + '<code>Code.gs</code> for step-by-step instructions.</div>';
+    renderUsageItemsTable(); // still show the item list so the UI isn't empty
+    return;
+  }
+  try{
+    STATE = await apiGet('getAll');
+    connEl.textContent = 'Connected';
+    connEl.className = 'ok';
+    document.getElementById('setupNoticeWrap').innerHTML = '';
+  } catch(err){
+    connEl.textContent = 'Connection error';
+    connEl.className = 'bad';
+    document.getElementById('setupNoticeWrap').innerHTML =
+      '<div id="setupNotice">Could not reach the backend: ' + String(err.message||err)
+      + '. Check that the Apps Script deployment is set to "Anyone" access and the URL is correct.</div>';
+  }
+  renderAll();
+}
+
+function renderAll(){
+  renderUsageItemsTable();
+  renderPatientDatalist();
+  renderPurchaseForm();
+  renderUsageLog();
+  renderPurchaseLog();
+  renderAdmin();
+  renderActiveReport();
+}
+
+/* ---------- RECORD USAGE ---------- */
+function renderUsageItemsTable(){
+  const body = document.getElementById('usageItemsBody');
+  const items = STATE.items.length ? STATE.items : [];
+  body.innerHTML = items.map((it,i)=>`
+    <tr>
+      <td>${it.ItemName}</td>
+      <td class="qty-cell"><input type="number" min="0" step="any" data-item="${escapeAttr(it.ItemName)}" data-unit-id="unit_${i}"></td>
+      <td class="unit-cell">
+        <select id="unit_${i}">
+          <option value="pieces" ${it.DefaultUnit==='pieces'?'selected':''}>pieces</option>
+          <option value="ml" ${it.DefaultUnit==='ml'?'selected':''}>ml</option>
+        </select>
+      </td>
+    </tr>`).join('');
+}
+
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderPatientDatalist(){
+  const names = [...new Set(STATE.consumableLog.map(e=>e.PatientName).filter(Boolean))].sort();
+  document.getElementById('patientList').innerHTML = names.map(n=>`<option value="${escapeAttr(n)}">`).join('');
+  const sel = document.getElementById('rp_patient');
+  sel.innerHTML = names.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+}
+
+document.getElementById('submitUsageBtn').addEventListener('click', async ()=>{
+  if(!apiConfigured()){ showToast('Backend not configured yet.', true); return; }
+  const date = document.getElementById('u_date').value;
+  const patient = document.getElementById('u_patient').value.trim();
+  const staff = document.getElementById('u_staff').value.trim();
+  const notes = document.getElementById('u_notes').value.trim();
+  if(!date || !patient){ showToast('Date and patient name are required.', true); return; }
+
+  const rows = document.querySelectorAll('#usageItemsBody tr');
+  const entries = [];
+  rows.forEach(tr=>{
+    const qtyInput = tr.querySelector('input[type=number]');
+    const qty = parseFloat(qtyInput.value);
+    if(qty > 0){
+      const itemName = qtyInput.dataset.item;
+      const unit = tr.querySelector('select').value;
+      entries.push({date, patientName: patient, itemName, quantity: qty, unit, enteredBy: staff, notes});
+    }
+  });
+  if(!entries.length){ showToast('Enter a quantity for at least one item.', true); return; }
+
+  document.getElementById('submitUsageBtn').disabled = true;
+  try{
+    await apiPost('addConsumableEntries', {entries});
+    showToast(`Saved ${entries.length} item(s) for ${patient}.`);
+    document.querySelectorAll('#usageItemsBody input[type=number]').forEach(i=>i.value='');
+    document.getElementById('u_notes').value='';
+    STATE = await apiGet('getAll');
+    renderPatientDatalist(); renderUsageLog(); renderActiveReport();
+  } catch(err){
+    showToast('Save failed: ' + (err.message||err), true);
+  } finally{
+    document.getElementById('submitUsageBtn').disabled = false;
+  }
+});
+
+/* ---------- RECORD PURCHASE ---------- */
+function renderPurchaseForm(){
+  const itemSel = document.getElementById('p_item');
+  itemSel.innerHTML = STATE.items.map(it=>`<option value="${escapeAttr(it.ItemName)}" data-unit="${it.DefaultUnit}">${escapeHtml(it.ItemName)}</option>`).join('')
+    + '<option value="__new__">+ Add new item…</option>';
+  itemSel.onchange = ()=>{
+    if(itemSel.value === '__new__'){
+      const name = prompt('New item name:');
+      if(name){
+        const unit = prompt('Default unit (pieces or ml):','pieces') || 'pieces';
+        apiPost('addItem', {itemName:name, unit}).then(async ()=>{
+          STATE = await apiGet('getAll');
+          renderPurchaseForm(); renderUsageItemsTable(); renderAdmin();
+          document.getElementById('p_item').value = name;
+        }).catch(err=>showToast('Could not add item: '+(err.message||err), true));
+      } else {
+        itemSel.value = STATE.items[0] ? STATE.items[0].ItemName : '';
+      }
+    } else {
+      const opt = itemSel.selectedOptions[0];
+      document.getElementById('p_unit').value = opt.dataset.unit || 'pieces';
+    }
+  };
+
+  const vendorSel = document.getElementById('p_vendor');
+  vendorSel.innerHTML = STATE.vendors.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('')
+    + '<option value="__new__">+ Add new vendor…</option>';
+  vendorSel.onchange = ()=>{
+    if(vendorSel.value === '__new__'){
+      const name = prompt('New vendor name:');
+      if(name){
+        apiPost('addVendor', {vendorName:name}).then(async ()=>{
+          STATE = await apiGet('getAll');
+          renderPurchaseForm(); renderAdmin();
+          document.getElementById('p_vendor').value = name;
+        }).catch(err=>showToast('Could not add vendor: '+(err.message||err), true));
+      } else {
+        vendorSel.value = STATE.vendors[0] || '';
+      }
+    }
+  };
+}
+
+function recalcTotal(){
+  const qty = parseFloat(document.getElementById('p_qty').value)||0;
+  const cost = parseFloat(document.getElementById('p_cost').value)||0;
+  document.getElementById('p_total').value = (qty*cost).toFixed(2);
+}
+document.getElementById('p_qty').addEventListener('input', recalcTotal);
+document.getElementById('p_cost').addEventListener('input', recalcTotal);
+
+document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=>{
+  if(!apiConfigured()){ showToast('Backend not configured yet.', true); return; }
+  const entry = {
+    date: document.getElementById('p_date').value,
+    itemName: document.getElementById('p_item').value,
+    quantity: document.getElementById('p_qty').value,
+    unit: document.getElementById('p_unit').value,
+    costPerItem: document.getElementById('p_cost').value,
+    vendor: document.getElementById('p_vendor').value,
+    notes: document.getElementById('p_notes').value.trim()
+  };
+  if(!entry.date || !entry.itemName || !entry.quantity || !entry.costPerItem || !entry.vendor || entry.itemName==='__new__' || entry.vendor==='__new__'){
+    showToast('Please complete date, item, quantity, cost and vendor.', true); return;
+  }
+  document.getElementById('submitPurchaseBtn').disabled = true;
+  try{
+    await apiPost('addPurchaseEntry', {entry});
+    showToast('Purchase saved.');
+    document.getElementById('p_qty').value='';
+    document.getElementById('p_cost').value='';
+    document.getElementById('p_notes').value='';
+    document.getElementById('p_total').value='';
+    STATE = await apiGet('getAll');
+    renderPurchaseLog(); renderActiveReport();
+  } catch(err){
+    showToast('Save failed: ' + (err.message||err), true);
+  } finally{
+    document.getElementById('submitPurchaseBtn').disabled = false;
+  }
+});
+
+/* ---------- USAGE LOG ---------- */
+function renderUsageLog(){
+  const from = document.getElementById('ul_from').value;
+  const to = document.getElementById('ul_to').value;
+  const patientFilter = document.getElementById('ul_patient').value.trim().toLowerCase();
+  let rows = [...STATE.consumableLog];
+  if(from) rows = rows.filter(r=> r.EntryDate >= from);
+  if(to) rows = rows.filter(r=> r.EntryDate <= to);
+  if(patientFilter) rows = rows.filter(r=> String(r.PatientName||'').toLowerCase().includes(patientFilter));
+  rows.sort((a,b)=> (b.EntryDate||'').localeCompare(a.EntryDate||''));
+  document.getElementById('usageLogBody').innerHTML = rows.map(r=>`
+    <tr><td>${escapeHtml(r.EntryDate)}</td><td>${escapeHtml(r.PatientName)}</td><td>${escapeHtml(r.ItemName)}</td>
+    <td>${escapeHtml(r.Quantity)}</td><td>${escapeHtml(r.Unit)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td></tr>
+  `).join('') || '<tr><td colspan="7" class="muted">No entries.</td></tr>';
+}
+['ul_from','ul_to','ul_patient'].forEach(id=> document.getElementById(id).addEventListener('input', renderUsageLog));
+document.getElementById('ul_export').addEventListener('click', ()=>{
+  exportCSV('usage_log.csv', ['EntryDate','PatientName','ItemName','Quantity','Unit','EnteredBy','Notes'],
+    getFilteredUsageRows());
+});
+function getFilteredUsageRows(){
+  const from = document.getElementById('ul_from').value;
+  const to = document.getElementById('ul_to').value;
+  const patientFilter = document.getElementById('ul_patient').value.trim().toLowerCase();
+  let rows = [...STATE.consumableLog];
+  if(from) rows = rows.filter(r=> r.EntryDate >= from);
+  if(to) rows = rows.filter(r=> r.EntryDate <= to);
+  if(patientFilter) rows = rows.filter(r=> String(r.PatientName||'').toLowerCase().includes(patientFilter));
+  return rows;
+}
+
+/* ---------- PURCHASE LOG ---------- */
+function renderPurchaseLog(){
+  const vendorSel = document.getElementById('pl_vendor');
+  if(vendorSel.options.length <= 1){
+    vendorSel.innerHTML = '<option value="">All vendors</option>' + STATE.vendors.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
+  }
+  document.getElementById('purchaseLogBody').innerHTML = getFilteredPurchaseRows().map(r=>`
+    <tr><td>${escapeHtml(r.PurchaseDate)}</td><td>${escapeHtml(r.ItemName)}</td><td>${escapeHtml(r.Quantity)}</td>
+    <td>${escapeHtml(r.Unit)}</td><td>₹${Number(r.CostPerItem).toFixed(2)}</td><td>₹${Number(r.TotalCost).toFixed(2)}</td>
+    <td>${escapeHtml(r.Vendor)}</td><td>${escapeHtml(r.Notes)}</td></tr>
+  `).join('') || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
+}
+function getFilteredPurchaseRows(){
+  const from = document.getElementById('pl_from').value;
+  const to = document.getElementById('pl_to').value;
+  const vendor = document.getElementById('pl_vendor').value;
+  let rows = [...STATE.purchaseLog];
+  if(from) rows = rows.filter(r=> r.PurchaseDate >= from);
+  if(to) rows = rows.filter(r=> r.PurchaseDate <= to);
+  if(vendor) rows = rows.filter(r=> r.Vendor === vendor);
+  rows.sort((a,b)=> (b.PurchaseDate||'').localeCompare(a.PurchaseDate||''));
+  return rows;
+}
+['pl_from','pl_to','pl_vendor'].forEach(id=> document.getElementById(id).addEventListener('input', renderPurchaseLog));
+document.getElementById('pl_export').addEventListener('click', ()=>{
+  exportCSV('purchase_log.csv', ['PurchaseDate','ItemName','Quantity','Unit','CostPerItem','TotalCost','Vendor','Notes'], getFilteredPurchaseRows());
+});
+
+/* ---------- COST MODEL ---------- */
+// Weighted average cost per unit for each item, derived from the purchase log.
+function computeAvgCostByItem(){
+  const totals = {}; // itemName -> {qty, cost}
+  STATE.purchaseLog.forEach(p=>{
+    const name = p.ItemName;
+    if(!totals[name]) totals[name] = {qty:0, cost:0};
+    totals[name].qty += Number(p.Quantity)||0;
+    totals[name].cost += Number(p.TotalCost)||0;
+  });
+  const avg = {};
+  Object.keys(totals).forEach(name=>{
+    avg[name] = totals[name].qty > 0 ? totals[name].cost / totals[name].qty : null;
+  });
+  return avg;
+}
+
+/* ---------- REPORTS ---------- */
+document.querySelectorAll('.rtab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.rpanel').forEach(p=> p.style.display='none');
+    document.getElementById('report-'+btn.dataset.r).style.display='block';
+  });
+});
+document.getElementById('rp_patient').addEventListener('change', renderPatientReport);
+
+function renderActiveReport(){
+  const active = document.querySelector('.rtab.active');
+  const r = active ? active.dataset.r : 'patient';
+  if(r==='patient') renderPatientReport();
+  if(r==='month') renderMonthReport();
+  if(r==='year') renderYearReport();
+  if(r==='vendor') renderVendorReport();
+}
+
+function renderPatientReport(){
+  const avg = computeAvgCostByItem();
+  const patient = document.getElementById('rp_patient').value;
+  const entries = STATE.consumableLog.filter(e=> e.PatientName === patient);
+  const byItem = {};
+  entries.forEach(e=>{
+    const key = e.ItemName;
+    if(!byItem[key]) byItem[key] = {qty:0, unit:e.Unit};
+    byItem[key].qty += Number(e.Quantity)||0;
+  });
+  let totalCost = 0;
+  const rows = Object.keys(byItem).sort().map(name=>{
+    const q = byItem[name].qty;
+    const unitCost = avg[name];
+    const cost = unitCost!=null ? q*unitCost : 0;
+    totalCost += cost;
+    return {name, qty:q, unit:byItem[name].unit, unitCost, cost};
+  });
+  document.getElementById('rp_body').innerHTML = rows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}</td><td>${r.qty}</td><td>${escapeHtml(r.unit)}</td>
+    <td>${r.unitCost!=null ? '₹'+r.unitCost.toFixed(2) : '<span class="muted">no purchase data</span>'}</td>
+    <td>₹${r.cost.toFixed(2)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No entries for this patient.</td></tr>';
+
+  const dates = [...new Set(entries.map(e=>e.EntryDate))].sort();
+  document.getElementById('rp_stats').innerHTML = `
+    <div class="stat"><div class="num">₹${totalCost.toFixed(2)}</div><div class="lbl">Total consumable cost</div></div>
+    <div class="stat"><div class="num">${dates.length}</div><div class="lbl">Visit dates</div></div>
+    <div class="stat"><div class="num">${rows.length}</div><div class="lbl">Distinct items used</div></div>
+  `;
+
+  // all-patients summary
+  const byPatient = {};
+  STATE.consumableLog.forEach(e=>{
+    if(!e.PatientName) return;
+    if(!byPatient[e.PatientName]) byPatient[e.PatientName] = {dates:new Set(), cost:0};
+    const unitCost = avg[e.ItemName];
+    byPatient[e.PatientName].dates.add(e.EntryDate);
+    if(unitCost!=null) byPatient[e.PatientName].cost += (Number(e.Quantity)||0)*unitCost;
+  });
+  const allRows = Object.keys(byPatient).sort().map(name=>({
+    name, dates: byPatient[name].dates.size, cost: byPatient[name].cost
+  }));
+  document.getElementById('rp_all_body').innerHTML = allRows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}</td><td>${r.dates}</td><td>₹${r.cost.toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3" class="muted">No data yet.</td></tr>';
+}
+document.getElementById('rp_export').addEventListener('click', ()=>{
+  const avg = computeAvgCostByItem();
+  const patient = document.getElementById('rp_patient').value;
+  const entries = STATE.consumableLog.filter(e=> e.PatientName === patient);
+  const byItem = {};
+  entries.forEach(e=>{
+    const key = e.ItemName;
+    if(!byItem[key]) byItem[key] = {qty:0, unit:e.Unit};
+    byItem[key].qty += Number(e.Quantity)||0;
+  });
+  const rows = Object.keys(byItem).map(name=>{
+    const q = byItem[name].qty;
+    const unitCost = avg[name];
+    return {ItemName:name, Quantity:q, Unit:byItem[name].unit, AvgCostPerUnit: unitCost!=null?unitCost.toFixed(2):'', Cost:(unitCost!=null?(q*unitCost).toFixed(2):'0.00')};
+  });
+  const safeName = (patient||'unknown').split(' ').join('_');
+  exportCSV(`patient_cost_${safeName}.csv`, ['ItemName','Quantity','Unit','AvgCostPerUnit','Cost'], rows);
+});
+
+function renderMonthReport(){
+  const avg = computeAvgCostByItem();
+  const usageByMonth = {}, purchaseByMonth = {};
+  STATE.consumableLog.forEach(e=>{
+    const m = (e.EntryDate||'').slice(0,7);
+    if(!m) return;
+    const unitCost = avg[e.ItemName];
+    usageByMonth[m] = (usageByMonth[m]||0) + (unitCost!=null ? (Number(e.Quantity)||0)*unitCost : 0);
+  });
+  STATE.purchaseLog.forEach(p=>{
+    const m = (p.PurchaseDate||'').slice(0,7);
+    if(!m) return;
+    purchaseByMonth[m] = (purchaseByMonth[m]||0) + (Number(p.TotalCost)||0);
+  });
+  const months = [...new Set([...Object.keys(usageByMonth), ...Object.keys(purchaseByMonth)])].sort().reverse();
+  document.getElementById('rm_body').innerHTML = months.map(m=>`
+    <tr><td>${m}</td><td>₹${(usageByMonth[m]||0).toFixed(2)}</td><td>₹${(purchaseByMonth[m]||0).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3" class="muted">No data yet.</td></tr>';
+}
+document.getElementById('rm_export').addEventListener('click', ()=>{
+  const avg = computeAvgCostByItem();
+  const usageByMonth = {}, purchaseByMonth = {};
+  STATE.consumableLog.forEach(e=>{
+    const m = (e.EntryDate||'').slice(0,7);
+    if(!m) return;
+    const unitCost = avg[e.ItemName];
+    usageByMonth[m] = (usageByMonth[m]||0) + (unitCost!=null ? (Number(e.Quantity)||0)*unitCost : 0);
+  });
+  STATE.purchaseLog.forEach(p=>{
+    const m = (p.PurchaseDate||'').slice(0,7);
+    if(!m) return;
+    purchaseByMonth[m] = (purchaseByMonth[m]||0) + (Number(p.TotalCost)||0);
+  });
+  const months = [...new Set([...Object.keys(usageByMonth), ...Object.keys(purchaseByMonth)])].sort();
+  const rows = months.map(m=>({Month:m, UsageCost:(usageByMonth[m]||0).toFixed(2), PurchaseCost:(purchaseByMonth[m]||0).toFixed(2)}));
+  exportCSV('cost_per_month.csv', ['Month','UsageCost','PurchaseCost'], rows);
+});
+
+function renderYearReport(){
+  const avg = computeAvgCostByItem();
+  const usageByYear = {}, purchaseByYear = {};
+  STATE.consumableLog.forEach(e=>{
+    const y = (e.EntryDate||'').slice(0,4);
+    if(!y) return;
+    const unitCost = avg[e.ItemName];
+    usageByYear[y] = (usageByYear[y]||0) + (unitCost!=null ? (Number(e.Quantity)||0)*unitCost : 0);
+  });
+  STATE.purchaseLog.forEach(p=>{
+    const y = (p.PurchaseDate||'').slice(0,4);
+    if(!y) return;
+    purchaseByYear[y] = (purchaseByYear[y]||0) + (Number(p.TotalCost)||0);
+  });
+  const years = [...new Set([...Object.keys(usageByYear), ...Object.keys(purchaseByYear)])].sort().reverse();
+  document.getElementById('ry_body').innerHTML = years.map(y=>`
+    <tr><td>${y}</td><td>₹${(usageByYear[y]||0).toFixed(2)}</td><td>₹${(purchaseByYear[y]||0).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="3" class="muted">No data yet.</td></tr>';
+}
+document.getElementById('ry_export').addEventListener('click', ()=>{
+  const avg = computeAvgCostByItem();
+  const usageByYear = {}, purchaseByYear = {};
+  STATE.consumableLog.forEach(e=>{
+    const y = (e.EntryDate||'').slice(0,4);
+    if(!y) return;
+    const unitCost = avg[e.ItemName];
+    usageByYear[y] = (usageByYear[y]||0) + (unitCost!=null ? (Number(e.Quantity)||0)*unitCost : 0);
+  });
+  STATE.purchaseLog.forEach(p=>{
+    const y = (p.PurchaseDate||'').slice(0,4);
+    if(!y) return;
+    purchaseByYear[y] = (purchaseByYear[y]||0) + (Number(p.TotalCost)||0);
+  });
+  const years = [...new Set([...Object.keys(usageByYear), ...Object.keys(purchaseByYear)])].sort();
+  const rows = years.map(y=>({Year:y, UsageCost:(usageByYear[y]||0).toFixed(2), PurchaseCost:(purchaseByYear[y]||0).toFixed(2)}));
+  exportCSV('cost_per_year.csv', ['Year','UsageCost','PurchaseCost'], rows);
+});
+
+function renderVendorReport(){
+  const byVendor = {};
+  STATE.purchaseLog.forEach(p=>{
+    if(!p.Vendor) return;
+    if(!byVendor[p.Vendor]) byVendor[p.Vendor] = {count:0, qty:0, cost:0};
+    byVendor[p.Vendor].count += 1;
+    byVendor[p.Vendor].qty += Number(p.Quantity)||0;
+    byVendor[p.Vendor].cost += Number(p.TotalCost)||0;
+  });
+  const rows = Object.keys(byVendor).sort();
+  document.getElementById('rv_body').innerHTML = rows.map(v=>`
+    <tr><td>${escapeHtml(v)}</td><td>${byVendor[v].count}</td><td>${byVendor[v].qty}</td><td>₹${byVendor[v].cost.toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="muted">No purchases yet.</td></tr>';
+}
+document.getElementById('rv_export').addEventListener('click', ()=>{
+  const byVendor = {};
+  STATE.purchaseLog.forEach(p=>{
+    if(!p.Vendor) return;
+    if(!byVendor[p.Vendor]) byVendor[p.Vendor] = {count:0, qty:0, cost:0};
+    byVendor[p.Vendor].count += 1;
+    byVendor[p.Vendor].qty += Number(p.Quantity)||0;
+    byVendor[p.Vendor].cost += Number(p.TotalCost)||0;
+  });
+  const rows = Object.keys(byVendor).map(v=>({Vendor:v, Purchases:byVendor[v].count, TotalQty:byVendor[v].qty, TotalCost:byVendor[v].cost.toFixed(2)}));
+  exportCSV('cost_per_vendor.csv', ['Vendor','Purchases','TotalQty','TotalCost'], rows);
+});
+
+/* ---------- ADMIN ---------- */
+function renderAdmin(){
+  document.getElementById('a_itemsBody').innerHTML = STATE.items.map(it=>`
+    <tr><td>${escapeHtml(it.ItemName)}</td><td>${escapeHtml(it.DefaultUnit)}</td></tr>
+  `).join('');
+  document.getElementById('a_vendorsBody').innerHTML = STATE.vendors.map(v=>`<tr><td>${escapeHtml(v)}</td></tr>`).join('');
+}
+document.getElementById('a_addItem').addEventListener('click', async ()=>{
+  const name = document.getElementById('a_itemName').value.trim();
+  const unit = document.getElementById('a_itemUnit').value;
+  if(!name){ showToast('Enter an item name.', true); return; }
+  try{
+    await apiPost('addItem', {itemName:name, unit});
+    document.getElementById('a_itemName').value='';
+    STATE = await apiGet('getAll');
+    renderAll();
+    showToast('Item added.');
+  } catch(err){ showToast('Failed: '+(err.message||err), true); }
+});
+document.getElementById('a_addVendor').addEventListener('click', async ()=>{
+  const name = document.getElementById('a_vendorName').value.trim();
+  if(!name){ showToast('Enter a vendor name.', true); return; }
+  try{
+    await apiPost('addVendor', {vendorName:name});
+    document.getElementById('a_vendorName').value='';
+    STATE = await apiGet('getAll');
+    renderAll();
+    showToast('Vendor added.');
+  } catch(err){ showToast('Failed: '+(err.message||err), true); }
+});
+
+/* ---------- CSV EXPORT ---------- */
+function exportCSV(filename, headers, rows){
+  const esc = v => {
+    const s = String(v==null?'':v);
+    return /["\n,]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const lines = [headers.join(',')];
+  rows.forEach(r=> lines.push(headers.map(h=>esc(r[h])).join(',')));
+  const blob = new Blob([lines.join(String.fromCharCode(10))], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+init();
+</script>
+</body>
+</html>
