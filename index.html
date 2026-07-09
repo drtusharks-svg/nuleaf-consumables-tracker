@@ -269,13 +269,23 @@
   <div class="card">
     <h2>Reports</h2>
     <div class="report-tabs">
-      <button class="rtab active" data-r="patient">Cost per Patient</button>
+      <button class="rtab active" data-r="purchaseReport">Purchase Report</button>
+      <button class="rtab" data-r="patient">Cost per Patient</button>
       <button class="rtab" data-r="month">Cost per Month</button>
       <button class="rtab" data-r="year">Cost per Year</button>
       <button class="rtab" data-r="vendor">Cost per Vendor</button>
     </div>
 
-    <div id="report-patient" class="rpanel">
+    <div id="report-purchaseReport" class="rpanel">
+      <div class="flex-between"><span class="muted">Every purchased item, grouped by purchase date, with cost and a daily total</span>
+        <button class="ghost" id="rpr_export">Export CSV</button></div>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>Cost</th><th>Vendor</th></tr></thead>
+        <tbody id="rpr_body"></tbody></table>
+      </div>
+    </div>
+
+    <div id="report-patient" class="rpanel" style="display:none;">
       <div class="row">
         <div class="field" style="flex:2;">
           <label>Patient</label>
@@ -905,12 +915,41 @@ document.getElementById('rp_patient').addEventListener('change', renderPatientRe
 
 function renderActiveReport(){
   const active = document.querySelector('.rtab.active');
-  const r = active ? active.dataset.r : 'patient';
+  const r = active ? active.dataset.r : 'purchaseReport';
+  if(r==='purchaseReport') renderPurchaseReport();
   if(r==='patient') renderPatientReport();
   if(r==='month') renderMonthReport();
   if(r==='year') renderYearReport();
   if(r==='vendor') renderVendorReport();
 }
+
+function renderPurchaseReport(){
+  const rows = [...STATE.purchaseLog].sort((a,b)=>
+    (b.PurchaseDate||'').localeCompare(a.PurchaseDate||'') || String(a.ItemName||'').localeCompare(String(b.ItemName||'')));
+  const byDate = {};
+  rows.forEach(r=>{
+    const d = r.PurchaseDate || '(no date)';
+    if(!byDate[d]) byDate[d] = [];
+    byDate[d].push(r);
+  });
+  const dates = Object.keys(byDate).sort().reverse();
+  let html = '';
+  dates.forEach(d=>{
+    byDate[d].forEach(it=>{
+      const cost = Number(it.TotalCost)||0;
+      html += `<tr><td>${escapeHtml(d)}</td><td>${escapeHtml(it.ItemName)}</td><td>${escapeHtml(it.Quantity)}</td>
+        <td>${escapeHtml(it.Unit)}</td><td>₹${Number(it.CostPerItem).toFixed(2)}</td><td>₹${cost.toFixed(2)}</td><td>${escapeHtml(it.Vendor)}</td></tr>`;
+    });
+    const dateTotal = byDate[d].reduce((sum,it)=> sum + (Number(it.TotalCost)||0), 0);
+    html += `<tr style="background:var(--teal-pale); font-weight:700;">
+      <td colspan="5" style="text-align:right;">Total for ${escapeHtml(d)}</td><td>₹${dateTotal.toFixed(2)}</td><td></td></tr>`;
+  });
+  document.getElementById('rpr_body').innerHTML = html || '<tr><td colspan="7" class="muted">No purchases yet.</td></tr>';
+}
+document.getElementById('rpr_export').addEventListener('click', ()=>{
+  const rows = [...STATE.purchaseLog].sort((a,b)=> (b.PurchaseDate||'').localeCompare(a.PurchaseDate||''));
+  exportCSV('purchase_report_by_date.csv', ['PurchaseDate','ItemName','Quantity','Unit','CostPerItem','TotalCost','Vendor'], rows);
+});
 
 function renderPatientReport(){
   const avg = computeAvgCostByItem();
