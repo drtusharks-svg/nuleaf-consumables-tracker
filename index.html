@@ -207,8 +207,12 @@
     </div>
     <div class="row">
       <div class="field">
+        <label>Total Cost for this Line, excl. GST (₹)</label>
+        <input type="number" id="p_linetotal" min="0" step="any" placeholder="e.g. invoice's Amount column">
+      </div>
+      <div class="field">
         <label>Cost per Item, excl. GST (₹)</label>
-        <input type="number" id="p_cost" min="0" step="any">
+        <input type="number" id="p_cost" min="0" step="any" placeholder="auto-fills from Total, or type directly">
       </div>
       <div class="field">
         <label>GST %</label>
@@ -234,6 +238,7 @@
         <input type="text" id="p_total" disabled>
       </div>
     </div>
+    <div class="muted" style="margin:-8px 0 14px;">Tip: if the invoice gives one combined price for a box (e.g. "1X50" for ₹249), enter <strong>Quantity = 50</strong> (individual pieces) above, then <strong>Total Cost for this Line = 249</strong> here — Cost per Item fills in automatically as ₹4.98.</div>
     <div class="row">
       <div class="field" style="flex:2;">
         <label>Vendor</label>
@@ -664,7 +669,17 @@ function recalcTotal(){
   document.getElementById('p_gstamt').value = gstAmt.toFixed(2);
   document.getElementById('p_total').value = (base+gstAmt).toFixed(2);
 }
-document.getElementById('p_qty').addEventListener('input', recalcTotal);
+function recalcCostFromLineTotal(){
+  const qty = parseFloat(document.getElementById('p_qty').value)||0;
+  const lineTotal = parseFloat(document.getElementById('p_linetotal').value)||0;
+  if(qty > 0 && document.getElementById('p_linetotal').value !== ''){
+    const perItem = Math.round((lineTotal/qty) * 10000) / 10000; // round to 4 decimals, no trailing zeros
+    document.getElementById('p_cost').value = perItem;
+  }
+  recalcTotal();
+}
+document.getElementById('p_linetotal').addEventListener('input', recalcCostFromLineTotal);
+document.getElementById('p_qty').addEventListener('input', recalcCostFromLineTotal);
 document.getElementById('p_cost').addEventListener('input', recalcTotal);
 document.getElementById('p_gst').addEventListener('change', ()=>{
   if(document.getElementById('p_gst').value === '__custom__'){
@@ -709,6 +724,7 @@ document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=
     showToast('Purchase saved.');
     document.getElementById('p_qty').value='';
     document.getElementById('p_cost').value='';
+    document.getElementById('p_linetotal').value='';
     document.getElementById('p_notes').value='';
     document.getElementById('p_batch').value='';
     document.getElementById('p_expiry').value='';
