@@ -180,7 +180,7 @@
         <select id="p_item"></select>
       </div>
       <div class="field">
-        <label>Quantity</label>
+        <label>Quantity (individual pieces)</label>
         <input type="number" id="p_qty" min="0" step="any">
       </div>
       <div class="field">
@@ -189,6 +189,10 @@
           <option value="pieces">pieces</option>
           <option value="ml">ml</option>
         </select>
+      </div>
+      <div class="field">
+        <label>Bill's Unit Column (as printed)</label>
+        <input type="text" id="p_billunit" placeholder="e.g. 1X50, 1 Pcs, UNIT">
       </div>
     </div>
     <div class="row">
@@ -297,7 +301,7 @@
     </div>
     <div class="table-wrap" style="margin-top:14px;">
       <table>
-        <thead><tr><th>Date</th><th>Item</th><th>Batch</th><th>Expiry</th><th>MRP</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>GST %</th><th>GST Amt</th><th>Total</th><th>Vendor</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th>Batch</th><th>Expiry</th><th>MRP</th><th>Qty</th><th>Unit</th><th>Bill Unit</th><th>Cost/Item</th><th>GST %</th><th>GST Amt</th><th>Total</th><th>Vendor</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
         <tbody id="purchaseLogBody"></tbody>
       </table>
     </div>
@@ -320,7 +324,7 @@
       <div class="flex-between"><span class="muted">Every purchased item, grouped by purchase date, with cost and a daily total</span>
         <button class="ghost" id="rpr_export">Export CSV</button></div>
       <div class="table-wrap" style="margin-top:10px;">
-        <table><thead><tr><th>Date</th><th>Item</th><th>Batch</th><th>Expiry</th><th>MRP</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>GST %</th><th>GST Amt</th><th>Cost</th><th>Vendor</th></tr></thead>
+        <table><thead><tr><th>Date</th><th>Item</th><th>Batch</th><th>Expiry</th><th>MRP</th><th>Qty</th><th>Unit</th><th>Bill Unit</th><th>Cost/Item</th><th>GST %</th><th>GST Amt</th><th>Cost</th><th>Vendor</th></tr></thead>
         <tbody id="rpr_body"></tbody></table>
       </div>
     </div>
@@ -709,6 +713,7 @@ document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=
     mrp: document.getElementById('p_mrp').value,
     quantity: document.getElementById('p_qty').value,
     unit: document.getElementById('p_unit').value,
+    invoiceUnit: document.getElementById('p_billunit').value.trim(),
     costPerItem: document.getElementById('p_cost').value,
     gstPercent: document.getElementById('p_gst').value,
     vendor: document.getElementById('p_vendor').value,
@@ -725,6 +730,7 @@ document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=
     document.getElementById('p_qty').value='';
     document.getElementById('p_cost').value='';
     document.getElementById('p_linetotal').value='';
+    document.getElementById('p_billunit').value='';
     document.getElementById('p_notes').value='';
     document.getElementById('p_batch').value='';
     document.getElementById('p_expiry').value='';
@@ -866,7 +872,7 @@ function renderPurchaseLog(){
       <td>${escapeHtml(r.PurchaseDate)}</td><td>${escapeHtml(r.ItemName)}</td>
       <td>${escapeHtml(r.BatchNumber)}</td><td>${escapeHtml(r.ExpiryDate)}</td><td>${r.MRP!==''&&r.MRP!=null?'₹'+Number(r.MRP).toFixed(2):''}</td>
       <td>${escapeHtml(r.Quantity)}</td>
-      <td>${escapeHtml(r.Unit)}</td><td>₹${Number(r.CostPerItem).toFixed(2)}</td><td>${escapeHtml(r.GSTPercent||0)}%</td>
+      <td>${escapeHtml(r.Unit)}</td><td>${escapeHtml(r.InvoiceUnit)}</td><td>₹${Number(r.CostPerItem).toFixed(2)}</td><td>${escapeHtml(r.GSTPercent||0)}%</td>
       <td>₹${Number(r.GSTAmount||0).toFixed(2)}</td><td>₹${Number(r.TotalCost).toFixed(2)}</td>
       <td>${escapeHtml(r.Vendor)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td>
       <td>
@@ -874,7 +880,7 @@ function renderPurchaseLog(){
         <button class="sm cancel" data-action="delete-purchase" data-id="${escapeAttr(r.PurchaseID)}">Delete</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="15" class="muted">No entries.</td></tr>';
+  }).join('') || '<tr><td colspan="16" class="muted">No entries.</td></tr>';
 }
 
 function purchaseEditRowHtml(r){
@@ -891,6 +897,7 @@ function purchaseEditRowHtml(r){
       <td class="edit-cell"><input type="number" step="any" class="ed-mrp" value="${escapeAttr(r.MRP||'')}" style="width:75px;"></td>
       <td class="edit-cell"><input type="number" step="any" class="ed-qty" value="${escapeAttr(r.Quantity)}" style="width:70px;"></td>
       <td class="edit-cell"><select class="ed-unit">${unitOpts}</select></td>
+      <td class="edit-cell"><input type="text" class="ed-billunit" value="${escapeAttr(r.InvoiceUnit||'')}" style="width:80px;"></td>
       <td class="edit-cell"><input type="number" step="any" class="ed-cost" value="${escapeAttr(r.CostPerItem)}" style="width:75px;"></td>
       <td class="edit-cell"><input type="number" step="any" class="ed-gst" value="${escapeAttr(r.GSTPercent||0)}" style="width:60px;"></td>
       <td class="muted">auto</td>
@@ -938,6 +945,7 @@ document.getElementById('purchaseLogBody').addEventListener('click', async (e)=>
       mrp: tr.querySelector('.ed-mrp').value,
       quantity: tr.querySelector('.ed-qty').value,
       unit: tr.querySelector('.ed-unit').value,
+      invoiceUnit: tr.querySelector('.ed-billunit').value.trim(),
       costPerItem: tr.querySelector('.ed-cost').value,
       gstPercent: tr.querySelector('.ed-gst').value,
       vendor: tr.querySelector('.ed-vendor').value,
@@ -976,7 +984,7 @@ function getFilteredPurchaseRows(){
 }
 ['pl_from','pl_to','pl_vendor','pl_staff'].forEach(id=> document.getElementById(id).addEventListener('input', renderPurchaseLog));
 document.getElementById('pl_export').addEventListener('click', ()=>{
-  exportCSV('purchase_log.csv', ['PurchaseDate','ItemName','BatchNumber','ExpiryDate','MRP','Quantity','Unit','CostPerItem','GSTPercent','GSTAmount','TotalCost','Vendor','EnteredBy','Notes'], getFilteredPurchaseRows());
+  exportCSV('purchase_log.csv', ['PurchaseDate','ItemName','BatchNumber','ExpiryDate','MRP','Quantity','Unit','InvoiceUnit','CostPerItem','GSTPercent','GSTAmount','TotalCost','Vendor','EnteredBy','Notes'], getFilteredPurchaseRows());
 });
 
 /* ---------- COST MODEL ---------- */
@@ -1034,18 +1042,18 @@ function renderPurchaseReport(){
       html += `<tr><td>${escapeHtml(d)}</td><td>${escapeHtml(it.ItemName)}</td>
         <td>${escapeHtml(it.BatchNumber)}</td><td>${escapeHtml(it.ExpiryDate)}</td><td>${it.MRP!==''&&it.MRP!=null?'₹'+Number(it.MRP).toFixed(2):''}</td>
         <td>${escapeHtml(it.Quantity)}</td>
-        <td>${escapeHtml(it.Unit)}</td><td>₹${Number(it.CostPerItem).toFixed(2)}</td><td>${escapeHtml(it.GSTPercent||0)}%</td>
+        <td>${escapeHtml(it.Unit)}</td><td>${escapeHtml(it.InvoiceUnit)}</td><td>₹${Number(it.CostPerItem).toFixed(2)}</td><td>${escapeHtml(it.GSTPercent||0)}%</td>
         <td>₹${Number(it.GSTAmount||0).toFixed(2)}</td><td>₹${cost.toFixed(2)}</td><td>${escapeHtml(it.Vendor)}</td></tr>`;
     });
     const dateTotal = byDate[d].reduce((sum,it)=> sum + (Number(it.TotalCost)||0), 0);
     html += `<tr style="background:var(--teal-pale); font-weight:700;">
-      <td colspan="10" style="text-align:right;">Total for ${escapeHtml(d)}</td><td>₹${dateTotal.toFixed(2)}</td><td></td></tr>`;
+      <td colspan="11" style="text-align:right;">Total for ${escapeHtml(d)}</td><td>₹${dateTotal.toFixed(2)}</td><td></td></tr>`;
   });
-  document.getElementById('rpr_body').innerHTML = html || '<tr><td colspan="12" class="muted">No purchases yet.</td></tr>';
+  document.getElementById('rpr_body').innerHTML = html || '<tr><td colspan="13" class="muted">No purchases yet.</td></tr>';
 }
 document.getElementById('rpr_export').addEventListener('click', ()=>{
   const rows = [...STATE.purchaseLog].sort((a,b)=> (b.PurchaseDate||'').localeCompare(a.PurchaseDate||''));
-  exportCSV('purchase_report_by_date.csv', ['PurchaseDate','ItemName','BatchNumber','ExpiryDate','MRP','Quantity','Unit','CostPerItem','GSTPercent','GSTAmount','TotalCost','Vendor'], rows);
+  exportCSV('purchase_report_by_date.csv', ['PurchaseDate','ItemName','BatchNumber','ExpiryDate','MRP','Quantity','Unit','InvoiceUnit','CostPerItem','GSTPercent','GSTAmount','TotalCost','Vendor'], rows);
 });
 
 function renderPatientReport(){
