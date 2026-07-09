@@ -66,6 +66,14 @@
     background:none; border:1px solid var(--line); padding:8px 14px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--ink);
   }
   button.ghost:hover{border-color:var(--teal); color:var(--teal-dark);}
+  button.sm{
+    background:var(--teal-pale); color:var(--teal-dark); border:1px solid var(--teal); padding:4px 10px;
+    border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; margin-right:4px;
+  }
+  button.sm:hover{background:var(--teal); color:#fff;}
+  button.sm.cancel{background:none; border-color:var(--line); color:var(--ink-soft);}
+  button.sm.cancel:hover{border-color:var(--red); color:var(--red); background:none;}
+  td.edit-cell input, td.edit-cell select{padding:5px 6px; font-size:12.5px; min-width:90px;}
   table{width:100%; border-collapse:collapse; font-size:13.5px;}
   th,td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left;}
   th{background:var(--teal-pale); color:var(--teal-dark); font-weight:650; position:sticky; top:0;}
@@ -138,7 +146,7 @@
       </div>
       <div class="field">
         <label>Entered By (staff)</label>
-        <input type="text" id="u_staff" placeholder="Your name">
+        <select id="u_staff"></select>
       </div>
     </div>
     <div class="table-wrap" style="max-height:440px;">
@@ -196,6 +204,10 @@
         <label>Vendor</label>
         <select id="p_vendor"></select>
       </div>
+      <div class="field">
+        <label>Entered By (staff)</label>
+        <select id="p_staff"></select>
+      </div>
     </div>
     <div class="row">
       <div class="field" style="flex:3;">
@@ -213,16 +225,17 @@
   <div class="card">
     <div class="flex-between">
       <h2 style="margin:0;">Usage log</h2>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <input type="date" id="ul_from">
         <input type="date" id="ul_to">
         <input type="text" id="ul_patient" placeholder="Filter by patient…">
+        <select id="ul_staff"><option value="">All staff</option></select>
         <button class="ghost" id="ul_export">Export CSV</button>
       </div>
     </div>
     <div class="table-wrap" style="margin-top:14px;">
       <table>
-        <thead><tr><th>Date</th><th>Patient</th><th>Item</th><th>Qty</th><th>Unit</th><th>Staff</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Date</th><th>Patient</th><th>Item</th><th>Qty</th><th>Unit</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
         <tbody id="usageLogBody"></tbody>
       </table>
     </div>
@@ -234,16 +247,17 @@
   <div class="card">
     <div class="flex-between">
       <h2 style="margin:0;">Purchase log</h2>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <input type="date" id="pl_from">
         <input type="date" id="pl_to">
         <select id="pl_vendor"><option value="">All vendors</option></select>
+        <select id="pl_staff"><option value="">All staff</option></select>
         <button class="ghost" id="pl_export">Export CSV</button>
       </div>
     </div>
     <div class="table-wrap" style="margin-top:14px;">
       <table>
-        <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>Total</th><th>Vendor</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>Total</th><th>Vendor</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
         <tbody id="purchaseLogBody"></tbody>
       </table>
     </div>
@@ -332,6 +346,14 @@
     </div>
     <div class="table-wrap"><table><thead><tr><th>Vendor</th></tr></thead><tbody id="a_vendorsBody"></tbody></table></div>
   </div>
+  <div class="card">
+    <h2>Staff</h2>
+    <div class="row">
+      <div class="field" style="flex:2;"><label>New staff name</label><input type="text" id="a_staffName"></div>
+      <div class="field" style="justify-content:flex-end;"><button class="primary" id="a_addStaff">Add staff</button></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Staff</th></tr></thead><tbody id="a_staffBody"></tbody></table></div>
+  </div>
 </section>
 
 <div class="footer-note">Nuleaf Skin Clinic &amp; Hair Transplant Centre — internal use</div>
@@ -348,7 +370,7 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwCkDJWvhUAf5QvpU1QzlqcrMGw7EZBLUbU5ZQSbmqQMXM990b6lPhu_1seBa1Ek9y-wg/exec";
 /* ======================================= */
 
-let STATE = { items: [], vendors: [], consumableLog: [], purchaseLog: [] };
+let STATE = { items: [], vendors: [], staff: [], consumableLog: [], purchaseLog: [] };
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
@@ -396,8 +418,6 @@ document.querySelectorAll('nav button').forEach(btn=>{
 async function init(){
   document.getElementById('u_date').value = todayStr();
   document.getElementById('p_date').value = todayStr();
-  document.getElementById('u_staff').value = localStorage.getItem('nuleaf_staff_name') || '';
-  document.getElementById('u_staff').addEventListener('change', e=> localStorage.setItem('nuleaf_staff_name', e.target.value));
 
   const connEl = document.getElementById('connStatus');
   if(!apiConfigured()){
@@ -429,6 +449,7 @@ async function init(){
 function renderAll(){
   renderUsageItemsTable();
   renderPatientDatalist();
+  renderStaffDropdowns();
   renderPurchaseForm();
   renderUsageLog();
   renderPurchaseLog();
@@ -463,6 +484,51 @@ function renderPatientDatalist(){
   sel.innerHTML = names.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
 }
 
+function staffOptionsHtml(withAddNew){
+  let html = STATE.staff.map(s=>`<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  if(withAddNew) html += '<option value="__new__">+ Add new…</option>';
+  return html;
+}
+
+function renderStaffDropdowns(){
+  const lastStaff = localStorage.getItem('nuleaf_staff_name') || '';
+
+  const uSel = document.getElementById('u_staff');
+  uSel.innerHTML = staffOptionsHtml(true);
+  if(STATE.staff.includes(lastStaff)) uSel.value = lastStaff;
+  uSel.onchange = ()=> handleStaffSelectChange(uSel, ()=> renderUsageItemsTable());
+
+  const pSel = document.getElementById('p_staff');
+  pSel.innerHTML = staffOptionsHtml(true);
+  if(STATE.staff.includes(lastStaff)) pSel.value = lastStaff;
+  pSel.onchange = ()=> handleStaffSelectChange(pSel, ()=>{});
+
+  // Plain filter dropdowns (no add-new) for the log panels
+  const ulSel = document.getElementById('ul_staff');
+  ulSel.innerHTML = '<option value="">All staff</option>' + staffOptionsHtml(false);
+  const plSel = document.getElementById('pl_staff');
+  plSel.innerHTML = '<option value="">All staff</option>' + staffOptionsHtml(false);
+}
+
+function handleStaffSelectChange(selectEl, afterRefresh){
+  if(selectEl.value === '__new__'){
+    const name = prompt('New staff name:');
+    if(name){
+      apiPost('addStaff', {staffName:name}).then(async ()=>{
+        STATE = await apiGet('getAll');
+        renderStaffDropdowns(); renderAdmin();
+        document.getElementById(selectEl.id).value = name;
+        localStorage.setItem('nuleaf_staff_name', name);
+        afterRefresh();
+      }).catch(err=>showToast('Could not add staff: '+(err.message||err), true));
+    } else {
+      selectEl.value = STATE.staff[0] || '';
+    }
+  } else {
+    localStorage.setItem('nuleaf_staff_name', selectEl.value);
+  }
+}
+
 document.getElementById('submitUsageBtn').addEventListener('click', async ()=>{
   if(!apiConfigured()){ showToast('Backend not configured yet.', true); return; }
   const date = document.getElementById('u_date').value;
@@ -470,6 +536,7 @@ document.getElementById('submitUsageBtn').addEventListener('click', async ()=>{
   const staff = document.getElementById('u_staff').value.trim();
   const notes = document.getElementById('u_notes').value.trim();
   if(!date || !patient){ showToast('Date and patient name are required.', true); return; }
+  if(staff === '__new__'){ showToast('Please finish adding the new staff name first.', true); return; }
 
   const rows = document.querySelectorAll('#usageItemsBody tr');
   const entries = [];
@@ -559,10 +626,11 @@ document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=
     unit: document.getElementById('p_unit').value,
     costPerItem: document.getElementById('p_cost').value,
     vendor: document.getElementById('p_vendor').value,
+    enteredBy: document.getElementById('p_staff').value,
     notes: document.getElementById('p_notes').value.trim()
   };
-  if(!entry.date || !entry.itemName || !entry.quantity || !entry.costPerItem || !entry.vendor || entry.itemName==='__new__' || entry.vendor==='__new__'){
-    showToast('Please complete date, item, quantity, cost and vendor.', true); return;
+  if(!entry.date || !entry.itemName || !entry.quantity || !entry.costPerItem || !entry.vendor || entry.itemName==='__new__' || entry.vendor==='__new__' || entry.enteredBy==='__new__'){
+    showToast('Please complete date, item, quantity, cost, vendor and staff.', true); return;
   }
   document.getElementById('submitPurchaseBtn').disabled = true;
   try{
@@ -582,21 +650,97 @@ document.getElementById('submitPurchaseBtn').addEventListener('click', async ()=
 });
 
 /* ---------- USAGE LOG ---------- */
+let editingUsageId = null;
+
 function renderUsageLog(){
-  const from = document.getElementById('ul_from').value;
-  const to = document.getElementById('ul_to').value;
-  const patientFilter = document.getElementById('ul_patient').value.trim().toLowerCase();
-  let rows = [...STATE.consumableLog];
-  if(from) rows = rows.filter(r=> r.EntryDate >= from);
-  if(to) rows = rows.filter(r=> r.EntryDate <= to);
-  if(patientFilter) rows = rows.filter(r=> String(r.PatientName||'').toLowerCase().includes(patientFilter));
+  const rows = getFilteredUsageRows();
   rows.sort((a,b)=> (b.EntryDate||'').localeCompare(a.EntryDate||''));
-  document.getElementById('usageLogBody').innerHTML = rows.map(r=>`
-    <tr><td>${escapeHtml(r.EntryDate)}</td><td>${escapeHtml(r.PatientName)}</td><td>${escapeHtml(r.ItemName)}</td>
-    <td>${escapeHtml(r.Quantity)}</td><td>${escapeHtml(r.Unit)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td></tr>
-  `).join('') || '<tr><td colspan="7" class="muted">No entries.</td></tr>';
+  document.getElementById('usageLogBody').innerHTML = rows.map(r=>{
+    if(r.EntryID === editingUsageId) return usageEditRowHtml(r);
+    return `
+    <tr>
+      <td>${escapeHtml(r.EntryDate)}</td><td>${escapeHtml(r.PatientName)}</td><td>${escapeHtml(r.ItemName)}</td>
+      <td>${escapeHtml(r.Quantity)}</td><td>${escapeHtml(r.Unit)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td>
+      <td>
+        <button class="sm" data-action="edit-usage" data-id="${escapeAttr(r.EntryID)}">Edit</button>
+        <button class="sm cancel" data-action="delete-usage" data-id="${escapeAttr(r.EntryID)}">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
 }
-['ul_from','ul_to','ul_patient'].forEach(id=> document.getElementById(id).addEventListener('input', renderUsageLog));
+
+function usageEditRowHtml(r){
+  const itemOpts = STATE.items.map(it=>`<option value="${escapeAttr(it.ItemName)}" ${it.ItemName===r.ItemName?'selected':''}>${escapeHtml(it.ItemName)}</option>`).join('');
+  const unitOpts = ['pieces','ml'].map(u=>`<option value="${u}" ${u===r.Unit?'selected':''}>${u}</option>`).join('');
+  const staffOpts = STATE.staff.map(s=>`<option value="${escapeAttr(s)}" ${s===r.EnteredBy?'selected':''}>${escapeHtml(s)}</option>`).join('');
+  return `
+    <tr data-editrow="${escapeAttr(r.EntryID)}">
+      <td class="edit-cell"><input type="date" class="ed-date" value="${escapeAttr(r.EntryDate)}"></td>
+      <td class="edit-cell"><input type="text" class="ed-patient" value="${escapeAttr(r.PatientName)}"></td>
+      <td class="edit-cell"><select class="ed-item">${itemOpts}</select></td>
+      <td class="edit-cell"><input type="number" step="any" class="ed-qty" value="${escapeAttr(r.Quantity)}" style="width:75px;"></td>
+      <td class="edit-cell"><select class="ed-unit">${unitOpts}</select></td>
+      <td class="edit-cell"><select class="ed-staff">${staffOpts}</select></td>
+      <td class="edit-cell"><input type="text" class="ed-notes" value="${escapeAttr(r.Notes||'')}"></td>
+      <td>
+        <button class="sm" data-action="save-usage" data-id="${escapeAttr(r.EntryID)}">Save</button>
+        <button class="sm cancel" data-action="cancel-usage">Cancel</button>
+      </td>
+    </tr>`;
+}
+
+document.getElementById('usageLogBody').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  if(action === 'edit-usage'){
+    editingUsageId = btn.dataset.id;
+    renderUsageLog();
+  } else if(action === 'cancel-usage'){
+    editingUsageId = null;
+    renderUsageLog();
+  } else if(action === 'delete-usage'){
+    if(!confirm('Delete this usage entry? This cannot be undone.')) return;
+    btn.disabled = true;
+    try{
+      await apiPost('deleteConsumableEntry', {entryId: btn.dataset.id});
+      showToast('Entry deleted.');
+      STATE = await apiGet('getAll');
+      renderPatientDatalist(); renderUsageLog(); renderActiveReport();
+    } catch(err){
+      showToast('Delete failed: '+(err.message||err), true);
+      btn.disabled = false;
+    }
+  } else if(action === 'save-usage'){
+    const tr = btn.closest('tr');
+    const payload = {
+      entryId: btn.dataset.id,
+      date: tr.querySelector('.ed-date').value,
+      patientName: tr.querySelector('.ed-patient').value.trim(),
+      itemName: tr.querySelector('.ed-item').value,
+      quantity: tr.querySelector('.ed-qty').value,
+      unit: tr.querySelector('.ed-unit').value,
+      enteredBy: tr.querySelector('.ed-staff').value,
+      notes: tr.querySelector('.ed-notes').value.trim()
+    };
+    if(!payload.date || !payload.patientName || !payload.quantity){
+      showToast('Date, patient and quantity are required.', true); return;
+    }
+    btn.disabled = true;
+    try{
+      await apiPost('updateConsumableEntry', payload);
+      showToast('Entry updated.');
+      editingUsageId = null;
+      STATE = await apiGet('getAll');
+      renderPatientDatalist(); renderUsageLog(); renderActiveReport();
+    } catch(err){
+      showToast('Update failed: '+(err.message||err), true);
+      btn.disabled = false;
+    }
+  }
+});
+
+['ul_from','ul_to','ul_patient','ul_staff'].forEach(id=> document.getElementById(id).addEventListener('input', renderUsageLog));
 document.getElementById('ul_export').addEventListener('click', ()=>{
   exportCSV('usage_log.csv', ['EntryDate','PatientName','ItemName','Quantity','Unit','EnteredBy','Notes'],
     getFilteredUsageRows());
@@ -605,39 +749,130 @@ function getFilteredUsageRows(){
   const from = document.getElementById('ul_from').value;
   const to = document.getElementById('ul_to').value;
   const patientFilter = document.getElementById('ul_patient').value.trim().toLowerCase();
+  const staffFilter = document.getElementById('ul_staff').value;
   let rows = [...STATE.consumableLog];
   if(from) rows = rows.filter(r=> r.EntryDate >= from);
   if(to) rows = rows.filter(r=> r.EntryDate <= to);
   if(patientFilter) rows = rows.filter(r=> String(r.PatientName||'').toLowerCase().includes(patientFilter));
+  if(staffFilter) rows = rows.filter(r=> r.EnteredBy === staffFilter);
   return rows;
 }
 
 /* ---------- PURCHASE LOG ---------- */
+let editingPurchaseId = null;
+
 function renderPurchaseLog(){
   const vendorSel = document.getElementById('pl_vendor');
   if(vendorSel.options.length <= 1){
     vendorSel.innerHTML = '<option value="">All vendors</option>' + STATE.vendors.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
   }
-  document.getElementById('purchaseLogBody').innerHTML = getFilteredPurchaseRows().map(r=>`
-    <tr><td>${escapeHtml(r.PurchaseDate)}</td><td>${escapeHtml(r.ItemName)}</td><td>${escapeHtml(r.Quantity)}</td>
-    <td>${escapeHtml(r.Unit)}</td><td>₹${Number(r.CostPerItem).toFixed(2)}</td><td>₹${Number(r.TotalCost).toFixed(2)}</td>
-    <td>${escapeHtml(r.Vendor)}</td><td>${escapeHtml(r.Notes)}</td></tr>
-  `).join('') || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
+  const rows = getFilteredPurchaseRows();
+  document.getElementById('purchaseLogBody').innerHTML = rows.map(r=>{
+    if(r.PurchaseID === editingPurchaseId) return purchaseEditRowHtml(r);
+    return `
+    <tr>
+      <td>${escapeHtml(r.PurchaseDate)}</td><td>${escapeHtml(r.ItemName)}</td><td>${escapeHtml(r.Quantity)}</td>
+      <td>${escapeHtml(r.Unit)}</td><td>₹${Number(r.CostPerItem).toFixed(2)}</td><td>₹${Number(r.TotalCost).toFixed(2)}</td>
+      <td>${escapeHtml(r.Vendor)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td>
+      <td>
+        <button class="sm" data-action="edit-purchase" data-id="${escapeAttr(r.PurchaseID)}">Edit</button>
+        <button class="sm cancel" data-action="delete-purchase" data-id="${escapeAttr(r.PurchaseID)}">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="muted">No entries.</td></tr>';
 }
+
+function purchaseEditRowHtml(r){
+  const itemOpts = STATE.items.map(it=>`<option value="${escapeAttr(it.ItemName)}" ${it.ItemName===r.ItemName?'selected':''}>${escapeHtml(it.ItemName)}</option>`).join('');
+  const unitOpts = ['pieces','ml'].map(u=>`<option value="${u}" ${u===r.Unit?'selected':''}>${u}</option>`).join('');
+  const vendorOpts = STATE.vendors.map(v=>`<option value="${escapeAttr(v)}" ${v===r.Vendor?'selected':''}>${escapeHtml(v)}</option>`).join('');
+  const staffOpts = STATE.staff.map(s=>`<option value="${escapeAttr(s)}" ${s===r.EnteredBy?'selected':''}>${escapeHtml(s)}</option>`).join('');
+  return `
+    <tr data-editrow="${escapeAttr(r.PurchaseID)}">
+      <td class="edit-cell"><input type="date" class="ed-date" value="${escapeAttr(r.PurchaseDate)}"></td>
+      <td class="edit-cell"><select class="ed-item">${itemOpts}</select></td>
+      <td class="edit-cell"><input type="number" step="any" class="ed-qty" value="${escapeAttr(r.Quantity)}" style="width:70px;"></td>
+      <td class="edit-cell"><select class="ed-unit">${unitOpts}</select></td>
+      <td class="edit-cell"><input type="number" step="any" class="ed-cost" value="${escapeAttr(r.CostPerItem)}" style="width:75px;"></td>
+      <td class="muted">auto</td>
+      <td class="edit-cell"><select class="ed-vendor">${vendorOpts}</select></td>
+      <td class="edit-cell"><select class="ed-staff">${staffOpts}</select></td>
+      <td class="edit-cell"><input type="text" class="ed-notes" value="${escapeAttr(r.Notes||'')}"></td>
+      <td>
+        <button class="sm" data-action="save-purchase" data-id="${escapeAttr(r.PurchaseID)}">Save</button>
+        <button class="sm cancel" data-action="cancel-purchase">Cancel</button>
+      </td>
+    </tr>`;
+}
+
+document.getElementById('purchaseLogBody').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  if(action === 'edit-purchase'){
+    editingPurchaseId = btn.dataset.id;
+    renderPurchaseLog();
+  } else if(action === 'cancel-purchase'){
+    editingPurchaseId = null;
+    renderPurchaseLog();
+  } else if(action === 'delete-purchase'){
+    if(!confirm('Delete this purchase entry? This cannot be undone.')) return;
+    btn.disabled = true;
+    try{
+      await apiPost('deletePurchaseEntry', {purchaseId: btn.dataset.id});
+      showToast('Purchase deleted.');
+      STATE = await apiGet('getAll');
+      renderPurchaseLog(); renderActiveReport();
+    } catch(err){
+      showToast('Delete failed: '+(err.message||err), true);
+      btn.disabled = false;
+    }
+  } else if(action === 'save-purchase'){
+    const tr = btn.closest('tr');
+    const payload = {
+      purchaseId: btn.dataset.id,
+      date: tr.querySelector('.ed-date').value,
+      itemName: tr.querySelector('.ed-item').value,
+      quantity: tr.querySelector('.ed-qty').value,
+      unit: tr.querySelector('.ed-unit').value,
+      costPerItem: tr.querySelector('.ed-cost').value,
+      vendor: tr.querySelector('.ed-vendor').value,
+      enteredBy: tr.querySelector('.ed-staff').value,
+      notes: tr.querySelector('.ed-notes').value.trim()
+    };
+    if(!payload.date || !payload.quantity || !payload.costPerItem || !payload.vendor){
+      showToast('Date, quantity, cost and vendor are required.', true); return;
+    }
+    btn.disabled = true;
+    try{
+      await apiPost('updatePurchaseEntry', payload);
+      showToast('Purchase updated.');
+      editingPurchaseId = null;
+      STATE = await apiGet('getAll');
+      renderPurchaseLog(); renderActiveReport();
+    } catch(err){
+      showToast('Update failed: '+(err.message||err), true);
+      btn.disabled = false;
+    }
+  }
+});
+
 function getFilteredPurchaseRows(){
   const from = document.getElementById('pl_from').value;
   const to = document.getElementById('pl_to').value;
   const vendor = document.getElementById('pl_vendor').value;
+  const staffFilter = document.getElementById('pl_staff').value;
   let rows = [...STATE.purchaseLog];
   if(from) rows = rows.filter(r=> r.PurchaseDate >= from);
   if(to) rows = rows.filter(r=> r.PurchaseDate <= to);
   if(vendor) rows = rows.filter(r=> r.Vendor === vendor);
+  if(staffFilter) rows = rows.filter(r=> r.EnteredBy === staffFilter);
   rows.sort((a,b)=> (b.PurchaseDate||'').localeCompare(a.PurchaseDate||''));
   return rows;
 }
-['pl_from','pl_to','pl_vendor'].forEach(id=> document.getElementById(id).addEventListener('input', renderPurchaseLog));
+['pl_from','pl_to','pl_vendor','pl_staff'].forEach(id=> document.getElementById(id).addEventListener('input', renderPurchaseLog));
 document.getElementById('pl_export').addEventListener('click', ()=>{
-  exportCSV('purchase_log.csv', ['PurchaseDate','ItemName','Quantity','Unit','CostPerItem','TotalCost','Vendor','Notes'], getFilteredPurchaseRows());
+  exportCSV('purchase_log.csv', ['PurchaseDate','ItemName','Quantity','Unit','CostPerItem','TotalCost','Vendor','EnteredBy','Notes'], getFilteredPurchaseRows());
 });
 
 /* ---------- COST MODEL ---------- */
@@ -851,6 +1086,7 @@ function renderAdmin(){
     <tr><td>${escapeHtml(it.ItemName)}</td><td>${escapeHtml(it.DefaultUnit)}</td></tr>
   `).join('');
   document.getElementById('a_vendorsBody').innerHTML = STATE.vendors.map(v=>`<tr><td>${escapeHtml(v)}</td></tr>`).join('');
+  document.getElementById('a_staffBody').innerHTML = STATE.staff.map(s=>`<tr><td>${escapeHtml(s)}</td></tr>`).join('');
 }
 document.getElementById('a_addItem').addEventListener('click', async ()=>{
   const name = document.getElementById('a_itemName').value.trim();
@@ -873,6 +1109,17 @@ document.getElementById('a_addVendor').addEventListener('click', async ()=>{
     STATE = await apiGet('getAll');
     renderAll();
     showToast('Vendor added.');
+  } catch(err){ showToast('Failed: '+(err.message||err), true); }
+});
+document.getElementById('a_addStaff').addEventListener('click', async ()=>{
+  const name = document.getElementById('a_staffName').value.trim();
+  if(!name){ showToast('Enter a staff name.', true); return; }
+  try{
+    await apiPost('addStaff', {staffName:name});
+    document.getElementById('a_staffName').value='';
+    STATE = await apiGet('getAll');
+    renderAll();
+    showToast('Staff added.');
   } catch(err){ showToast('Failed: '+(err.message||err), true); }
 });
 
