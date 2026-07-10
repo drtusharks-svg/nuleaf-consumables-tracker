@@ -277,9 +277,10 @@
         <button class="ghost" id="ul_export">Export CSV</button>
       </div>
     </div>
-    <div class="table-wrap" style="margin-top:14px;">
+    <div class="stat-row" id="ul_stats" style="margin-top:14px;"></div>
+    <div class="table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Patient</th><th>Item</th><th>Qty</th><th>Unit</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Date</th><th>Patient</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost/Item</th><th>Line Cost</th><th>Staff</th><th>Notes</th><th>Actions</th></tr></thead>
         <tbody id="usageLogBody"></tbody>
       </table>
     </div>
@@ -753,18 +754,43 @@ let editingUsageId = null;
 function renderUsageLog(){
   const rows = getFilteredUsageRows();
   rows.sort((a,b)=> (b.EntryDate||'').localeCompare(a.EntryDate||''));
+  const avg = computeAvgCostByItem();
+  let totalCost = 0;
+  let unpricedCount = 0;
   document.getElementById('usageLogBody').innerHTML = rows.map(r=>{
     if(r.EntryID === editingUsageId) return usageEditRowHtml(r);
+    const unitCost = avg[r.ItemName];
+    const qty = Number(r.Quantity)||0;
+    const lineCost = unitCost!=null ? qty*unitCost : null;
+    if(lineCost!=null) totalCost += lineCost; else unpricedCount++;
     return `
     <tr>
       <td>${escapeHtml(r.EntryDate)}</td><td>${escapeHtml(r.PatientName)}</td><td>${escapeHtml(r.ItemName)}</td>
-      <td>${escapeHtml(r.Quantity)}</td><td>${escapeHtml(r.Unit)}</td><td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td>
+      <td>${escapeHtml(r.Quantity)}</td><td>${escapeHtml(r.Unit)}</td>
+      <td>${unitCost!=null ? '₹'+unitCost.toFixed(2) : '<span class="muted">no data</span>'}</td>
+      <td>${lineCost!=null ? '₹'+lineCost.toFixed(2) : '<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(r.EnteredBy)}</td><td>${escapeHtml(r.Notes)}</td>
       <td>
         <button class="sm" data-action="edit-usage" data-id="${escapeAttr(r.EntryID)}">Edit</button>
         <button class="sm cancel" data-action="delete-usage" data-id="${escapeAttr(r.EntryID)}">Delete</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
+  }).join('') || '<tr><td colspan="10" class="muted">No entries.</td></tr>';
+
+  const patientFilter = document.getElementById('ul_patient').value.trim();
+  const distinctPatients = new Set(rows.map(r=>r.PatientName)).size;
+  let statsHtml = `
+    <div class="stat"><div class="num">₹${totalCost.toFixed(2)}</div><div class="lbl">Total cost (filtered rows)</div></div>
+    <div class="stat"><div class="num">${rows.length}</div><div class="lbl">Entries shown</div></div>`;
+  if(patientFilter){
+    statsHtml += `<div class="stat"><div class="num">${escapeHtml(patientFilter)}</div><div class="lbl">Patient filter active</div></div>`;
+  } else {
+    statsHtml += `<div class="stat"><div class="num">${distinctPatients}</div><div class="lbl">Distinct patients shown</div></div>`;
+  }
+  if(unpricedCount > 0){
+    statsHtml += `<div class="stat"><div class="num">${unpricedCount}</div><div class="lbl">Rows with no purchase data yet</div></div>`;
+  }
+  document.getElementById('ul_stats').innerHTML = statsHtml;
 }
 
 function usageEditRowHtml(r){
@@ -778,6 +804,8 @@ function usageEditRowHtml(r){
       <td class="edit-cell"><select class="ed-item">${itemOpts}</select></td>
       <td class="edit-cell"><input type="number" step="any" class="ed-qty" value="${escapeAttr(r.Quantity)}" style="width:75px;"></td>
       <td class="edit-cell"><select class="ed-unit">${unitOpts}</select></td>
+      <td class="muted">auto</td>
+      <td class="muted">auto</td>
       <td class="edit-cell"><select class="ed-staff">${staffOpts}</select></td>
       <td class="edit-cell"><input type="text" class="ed-notes" value="${escapeAttr(r.Notes||'')}"></td>
       <td>
@@ -840,8 +868,19 @@ document.getElementById('usageLogBody').addEventListener('click', async (e)=>{
 
 ['ul_from','ul_to','ul_patient','ul_staff'].forEach(id=> document.getElementById(id).addEventListener('input', renderUsageLog));
 document.getElementById('ul_export').addEventListener('click', ()=>{
-  exportCSV('usage_log.csv', ['EntryDate','PatientName','ItemName','Quantity','Unit','EnteredBy','Notes'],
-    getFilteredUsageRows());
+  const avg = computeAvgCostByItem();
+  const rows = getFilteredUsageRows().map(r=>{
+    const unitCost = avg[r.ItemName];
+    const qty = Number(r.Quantity)||0;
+    return {
+      EntryDate: r.EntryDate, PatientName: r.PatientName, ItemName: r.ItemName,
+      Quantity: r.Quantity, Unit: r.Unit,
+      CostPerItem: unitCost!=null ? unitCost.toFixed(2) : '',
+      LineCost: unitCost!=null ? (qty*unitCost).toFixed(2) : '',
+      EnteredBy: r.EnteredBy, Notes: r.Notes
+    };
+  });
+  exportCSV('usage_log.csv', ['EntryDate','PatientName','ItemName','Quantity','Unit','CostPerItem','LineCost','EnteredBy','Notes'], rows);
 });
 function getFilteredUsageRows(){
   const from = document.getElementById('ul_from').value;
